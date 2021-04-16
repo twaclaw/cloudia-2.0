@@ -8,8 +8,8 @@
 
 TOPDIR ?= ../basicmac
 
-include $(TOPDIR)/projects/variants.mk
-include $(TOPDIR)/projects/platform.mk
+include $(TOPDIR)/../cloudia-src/variants.mk
+include $(TOPDIR)/../cloudia-src/platform.mk
 
 #TARGET ?= $(error "TARGET not specified (See platform.gmk for possible settings)")
 
