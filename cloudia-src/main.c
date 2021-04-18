@@ -43,17 +43,21 @@ static void sensor_loop(osjob_t *job)
 {
     static int status;
     static conf_t conf;
-    conf.options = 0x03;
+    conf.options = 0x07;
     conf.period = 0x45; // 5 seconds
     conf.buffer_size = 5;
 
     static enum {
         INIT,
+        MEAS,
         DONE,
     } state;
     switch(state){
         case INIT:
             bme280_config(job, sensor_loop, &status, &conf);
+            break;
+        case MEAS:
+            bme280_read(job, sensor_loop, &status, &conf);
             break;
         case DONE:
             debug_printf("DONE\r\n");

@@ -85,7 +85,7 @@ static void config_func(osjob_t *job)
 			goto config_error;
 		}
 		bme280.buf[0] = BME280_REG_DIG_T1;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_N_CALIB_U8, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_CALIB_NREGS, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
 		break;
 	case STORE_CALIB_COEFFS:
 		if (*bme280.pstatus != I2C_OK)
@@ -126,30 +126,59 @@ config_done:
 	os_setCallback(job, bme280.cb);
 }
 
-// int i;
-// static void read_func(osjob_t *job)
-// {
-// 	static enum {
-// 		INIT,
-// 		CALIB_DATA_DONE
-// 	} state;
-// 	switch (state)
-// 	{
-// 	case INIT:
-// 		debug_printf("INIT\n");
-// 		// buf[0] = BME280_REG_CTRL_MEAS;
-// 		buf[0] = BME280_REG_CTRL_MEAS;
-// 		// buf[1] = 1 << 2;
-// 		i2c_xfer_ex(BME280_ADDR, buf, 1, 1, ms2osticks(1500), job, read_func, status);
-// 		break;
-// 	case CALIB_DATA_DONE:
-// 		debug_printf("CALIB_DATA_DONE\n");
-// 		for (i=0;i<2;i++)
-// 			debug_printf("0x%x\r\n", buf[i]);
-// 		break;
-// 	}
-// 	state += 1;
-// }
+static void read_func(osjob_t *job)
+{
+	static enum {
+		INIT,
+		SET_MODE,
+		MEAS_WAIT,
+		MEAS_READY,
+		MEAS_DECODE
+	} state;
+	switch (state)
+	{
+	case INIT:
+		bme280.buf[0] = BME280_REG_CTRL_MEAS;
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, 1, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		break;
+	case SET_MODE:
+		bme280.buf[1] = bme280.buf[0] | BME280_CTRL_FORCE_MODE; // bits [1:0]
+		bme280.buf[0] = BME280_REG_CTRL_MEAS;
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		break;
+	case MEAS_WAIT:
+		if (*bme280.pstatus != I2C_OK)
+		{
+			goto read_error;
+		}
+		os_setApproxTimedCallback(job, os_getTime() + sec2osticks(1), read_func);
+		break;
+
+	case MEAS_READY:
+		// TODO: check status register
+		bme280.buf[0] = BME280_REG_PRESSURE;
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_SENSOR_NREGS, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		break;
+	case MEAS_DECODE:
+		if (*bme280.pstatus != I2C_OK)
+		{
+			goto read_error;
+		}
+		for (int i = 0; i < BME280_SENSOR_NREGS; i++)
+		{
+			debug_printf("%d: 0x%x\r\n", i, bme280.buf[i]);
+		}
+		goto read_done;
+	}
+	state += 1;
+	return;
+read_error:
+	*bme280.pstatus = BME280_ERROR;
+
+read_done:
+	state = INIT;
+	os_setCallback(job, bme280.cb);
+}
 
 void bme280_config(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf)
 {
@@ -157,4 +186,12 @@ void bme280_config(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf)
 	bme280.pstatus = pstatus;
 	bme280.pconf = pconf;
 	os_setCallback(job, config_func);
+}
+
+void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf)
+{
+	bme280.cb = cb;
+	bme280.pstatus = pstatus;
+	bme280.pconf = pconf;
+	os_setCallback(job, read_func);
 }

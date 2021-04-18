@@ -34,7 +34,7 @@
 #define BME280_REG_SOFTRESET 0xE0
 
 //calib26..calib41 0xE1...0xF0
-#define BME280_REG_CALIB26 0xE1 
+#define BME280_REG_CALIB26 0xE1
 
 #define BME280_REG_HUMIDITY 0xFD
 #define BME280_REG_TEMPERATURE 0xFA
@@ -45,7 +45,8 @@
 #define BME280_REG_CTRL_HUMIDITY 0xF2
 #define BME280_REG_RESET 0xE0
 
-enum {
+enum
+{
     BME280_CTRL_MEAS_SKIP = 0,
     BME280_CTRL_MEAS_OVERSMPL_1 = 1,
     BME280_CTRL_SLEEP_MODE = 0,
@@ -54,8 +55,9 @@ enum {
     BME280_CONFIG_FILTER_OFF = 0
 };
 
-#define BME280_N_CALIB_U8 33
-#define BME280_BUFF_SIZE (BME280_N_CALIB_U8 + 1) 
+#define BME280_CALIB_NREGS 33
+#define BME280_SENSOR_NREGS 8
+#define BME280_BUFF_SIZE (BME280_CALIB_NREGS + 1)
 
 typedef struct
 {
@@ -83,12 +85,13 @@ typedef struct
 
 typedef struct
 {
-    uint32_t Tr; 
+    uint32_t Tr;
     uint32_t Pr;
     uint16_t Hr;
 } bme280_raw_data_t;
 
 void bme280_config(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf);
+void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf);
 // void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, sht20_data *pdata);
 
 #endif
