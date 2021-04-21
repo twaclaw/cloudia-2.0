@@ -1,3 +1,4 @@
+#if defined(CFG_b_l072Z_lrwan1_board)
 #define BRD_I2C 1
 #define GPIO_I2C_SCL	BRD_GPIO_AF(PORT_B, 8, 4)
 #define GPIO_I2C_SDA	BRD_GPIO_AF(PORT_B, 9, 4)
@@ -76,3 +77,4 @@
 
 // brown-out
 #define BRD_borlevel   9 // RM0376, pg 116: BOR level 2, around 2.0 V
+#endif
