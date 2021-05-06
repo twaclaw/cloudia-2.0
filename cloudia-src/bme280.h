@@ -1,3 +1,12 @@
+/*
+  ____ _     ___  _   _ ____  _       
+ / ___| |   / _ \| | | |  _ \(_) __ _
+| |   | |  | | | | | | | | | | |/ _` |
+| |___| |__| |_| | |_| | |_| | | (_| |
+ \____|_____\___/ \___/|____/|_|\__,_|
+
+ Bosch BME280 library
+*/
 #ifndef _bme280_h_
 #define _bme280_h_
 
@@ -85,13 +94,22 @@ typedef struct
 
 typedef struct
 {
-    uint32_t Tr;
-    uint32_t Pr;
-    uint16_t Hr;
+    uint32_t T;
+    uint32_t P;
+    uint16_t H;
 } bme280_raw_data_t;
 
+typedef struct
+{
+    int32_t T;
+    uint32_t P;
+    uint32_t H;
+} bme280_data_t;
+
 void bme280_config(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf);
-void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf);
-// void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, sht20_data *pdata);
+void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, bme280_data_t *pdata, conf_t *pconf);
+int bme280_compensate_T(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme280_data_t *pdata);
+int bme280_compensate_H(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme280_data_t *pdata);
+int bme280_compensate_P(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme280_data_t *pdata);
 
 #endif

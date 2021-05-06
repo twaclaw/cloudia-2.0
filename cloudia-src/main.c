@@ -1,8 +1,10 @@
-// Copyright (C) 2020-2020 Michael Kuyper. All rights reserved.
-// Copyright (C) 2016-2019 Semtech (International) AG. All rights reserved.
-//
-// This file is subject to the terms and conditions defined in file 'LICENSE',
-// which is part of this source code package.
+/*
+  ____ _     ___  _   _ ____  _       
+ / ___| |   / _ \| | | |  _ \(_) __ _
+| |   | |  | | | | | | | | | | |/ _` |
+| |___| |__| |_| | |_| | |_| | | (_| |
+ \____|_____\___/ \___/|____/|_|\__,_|
+*/
 
 #include "lmic.h"
 #include "lwmux/lwmux.h"
@@ -12,6 +14,11 @@
 
 static lwm_job lj;
 static osjob_t *mainjob;
+
+static struct
+{
+    bme280_data_t bme280;
+} cloudia;
 
 static void next(osjob_t *job);
 static void sensor_loop(osjob_t *job);
@@ -55,7 +62,7 @@ static void sensor_loop(osjob_t *job)
     static conf_t conf;
     conf.options = 0x07;
     conf.period = 0x45; // 5 seconds
-    conf.buffer_size = 5;
+    conf.buffer_size = 55;
 
     uint8_t period = 5;
     static int8_t samples = 0;
@@ -75,7 +82,7 @@ static void sensor_loop(osjob_t *job)
         break;
     case MEAS:
         debug_printf("Measuring\r\n");
-        bme280_read(job, sensor_loop, &status, &conf);
+        bme280_read(job, sensor_loop, &status, &cloudia.bme280, &conf);
         state = NEXT;
         break;
     case NEXT:
@@ -87,7 +94,7 @@ static void sensor_loop(osjob_t *job)
         else
         {
             os_setCallback(job, sensor_loop);
-            state = TRANSMIT;
+            // state = TRANSMIT;
         }
         break;
     case TRANSMIT:
