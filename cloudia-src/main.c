@@ -10,6 +10,7 @@
 #include "lwmux/lwmux.h"
 #include "svcdefs.h"
 #include "bme280.h"
+#include "ina219.h"
 #include "conf.h"
 
 static lwm_job lj;
@@ -18,6 +19,7 @@ static osjob_t *mainjob;
 static struct
 {
     bme280_data_t bme280;
+    ina219_data_t ina219;
 } cloudia;
 
 static void next(osjob_t *job);
