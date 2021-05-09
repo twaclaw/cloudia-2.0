@@ -11,6 +11,8 @@
 #ifndef _ina219_h_
 #define _ina219_h_
 
+#include "conf.h"
+
 #define INA219_ADDR (0x40 << 1)
 #define INA219_ERROR -2
 #define INA219_I2C_TIMEOUT_MS ms2osticks(500)
@@ -23,7 +25,7 @@
 /*
  CONFIG
  Shunt ADC resolution average: bits 6:3
- {N}S: shunt samples averaged together
+ {N}S: shunt number of samples averaged together
  */
 #define INA219_CONFIG_SADCRES_9BIT_1S_84US (0)
 #define INA219_CONFIG_SADCRES_10BIT_1S_148US (1 << 3)
@@ -71,5 +73,5 @@ typedef struct {
 }ina219_data_t;
 
 void ina219_config(osjob_t *job, osjobcb_t cb, int *pstatus);
-void ina219_read(osjob_t *job, osjobcb_t cb, int *pstatus, ina219_data_t *pdata);
+void ina219_read(osjob_t *job, osjobcb_t cb, int *pstatus, ina219_data_t *pdata, conf_t *pconf);
 #endif

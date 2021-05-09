@@ -79,15 +79,20 @@ static void sensor_loop(osjob_t *job)
     switch (state)
     {
     case INIT:
-        bme280_config(job, sensor_loop, &status, &conf);
+        // bme280_config(job, sensor_loop, &status, &conf);
+        debug_printf("CONFIGURING\r\n");
+        ina219_config(job, sensor_loop, &status);
         state = MEAS;
         break;
     case MEAS:
-        debug_printf("Measuring\r\n");
-        bme280_read(job, sensor_loop, &status, &cloudia.bme280, &conf);
+        debug_printf("Measuring: status %d\r\n", status);
+        // bme280_read(job, sensor_loop, &status, &cloudia.bme280, &conf);
+        ina219_read(job, sensor_loop, &status, &cloudia.ina219, &conf);
         state = NEXT;
         break;
     case NEXT:
+        //TODO: check status
+        debug_printf("status: %d, current: 0x%x\r\n", status, cloudia.ina219.current);
         if (++samples < conf.buffer_size)
         {
             state = MEAS;

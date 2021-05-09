@@ -8,6 +8,13 @@
 #define CONF_OPT_P_ENABLED_MASK (1 << 2)
 #define CONF_OPT_I_ENABLED_MASK (1 << 3)
 #define CONF_OPT_T_HIGH_RES_MASK (1 << 4)
+
+#define CONF_OPT_I_NBITS_MASK (3 << 5)
+#define CONF_OPT_I_NBITS_12 (0 << 5)
+#define CONF_OPT_I_NBITS_11 (1 << 5)
+#define CONF_OPT_I_NBITS_10 (2 << 5)
+#define CONF_OPT_I_NBITS_9 (3 << 5)
+
 #define CONF_PERIOD_MINS_MASK (1 << 7)
 #define CONF_PERIOD_SECS_HRS_MASK (1 << 6)
 #define CONF_PERIOD_MINS_VALUE_MASK (0x7F)
