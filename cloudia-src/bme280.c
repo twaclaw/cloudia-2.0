@@ -31,7 +31,7 @@ static struct
 	conf_t *pconf;
 } bme280;
 
-static void config_func(osjob_t *job)
+static void config_fsm(osjob_t *job)
 {
 	static enum {
 		INIT,
@@ -45,7 +45,7 @@ static void config_func(osjob_t *job)
 	{
 	case INIT:
 		bme280.buf[0] = BME280_REG_CHIPID;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, 1, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, 1, BME280_I2C_TIMEOUT_MS, job, config_fsm, bme280.pstatus);
 		break;
 	case CONF_H:
 		if (*bme280.pstatus != I2C_OK || bme280.buf[0] != BME280_CHIP_ID)
@@ -62,7 +62,7 @@ static void config_func(osjob_t *job)
 		{
 			bme280.buf[1] = BME280_CTRL_MEAS_SKIP;
 		}
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_fsm, bme280.pstatus);
 		break;
 	case CONF_T_AND_P:
 		if (*bme280.pstatus != I2C_OK)
@@ -81,7 +81,7 @@ static void config_func(osjob_t *job)
 
 		bme280.buf[0] = BME280_REG_CTRL_MEAS;
 		bme280.buf[1] = ctrl_meas;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_fsm, bme280.pstatus);
 		break;
 	case CONF_FILTER:
 		if (*bme280.pstatus != I2C_OK)
@@ -90,7 +90,7 @@ static void config_func(osjob_t *job)
 		}
 		bme280.buf[0] = BME280_REG_CONFIG;
 		bme280.buf[1] = BME280_CONFIG_FILTER_OFF;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, config_fsm, bme280.pstatus);
 		break;
 	case READ_CALIB_COEFFS:
 		if (*bme280.pstatus != I2C_OK)
@@ -98,7 +98,7 @@ static void config_func(osjob_t *job)
 			goto config_error;
 		}
 		bme280.buf[0] = BME280_REG_DIG_T1;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_CALIB_NREGS, BME280_I2C_TIMEOUT_MS, job, config_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_CALIB_NREGS, BME280_I2C_TIMEOUT_MS, job, config_fsm, bme280.pstatus);
 		break;
 	case STORE_CALIB_COEFFS:
 		if (*bme280.pstatus != I2C_OK)
@@ -138,7 +138,7 @@ config_done:
 	os_setCallback(job, bme280.cb);
 }
 
-static void read_func(osjob_t *job)
+static void read_fsm(osjob_t *job)
 {
 	static enum {
 		INIT,
@@ -151,25 +151,25 @@ static void read_func(osjob_t *job)
 	{
 	case INIT:
 		bme280.buf[0] = BME280_REG_CTRL_MEAS;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, 1, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, 1, BME280_I2C_TIMEOUT_MS, job, read_fsm, bme280.pstatus);
 		break;
 	case SET_MODE:
 		bme280.buf[1] = bme280.buf[0] | BME280_CTRL_FORCE_MODE; // bits [1:0]
 		bme280.buf[0] = BME280_REG_CTRL_MEAS;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 2, 0, BME280_I2C_TIMEOUT_MS, job, read_fsm, bme280.pstatus);
 		break;
 	case MEAS_WAIT:
 		if (*bme280.pstatus != I2C_OK)
 		{
 			goto read_error;
 		}
-		os_setApproxTimedCallback(job, os_getTime() + sec2osticks(1), read_func);
+		os_setApproxTimedCallback(job, os_getTime() + sec2osticks(1), read_fsm);
 		break;
 
 	case MEAS_READY:
 		// TODO: check status register
 		bme280.buf[0] = BME280_REG_PRESSURE;
-		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_SENSOR_NREGS, BME280_I2C_TIMEOUT_MS, job, read_func, bme280.pstatus);
+		i2c_xfer_ex(BME280_ADDR, bme280.buf, 1, BME280_SENSOR_NREGS, BME280_I2C_TIMEOUT_MS, job, read_fsm, bme280.pstatus);
 		break;
 	case MEAS_DECODE:
 		if (*bme280.pstatus != I2C_OK)
@@ -218,7 +218,7 @@ void bme280_config(osjob_t *job, osjobcb_t cb, int *pstatus, conf_t *pconf)
 	bme280.cb = cb;
 	bme280.pstatus = pstatus;
 	bme280.pconf = pconf;
-	os_setCallback(job, config_func);
+	os_setCallback(job, config_fsm);
 }
 
 void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, bme280_data_t *pdata, conf_t *pconf)
@@ -228,7 +228,7 @@ void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, bme280_data_t *pdata,
 	bme280.pstatus = pstatus;
 	bme280.pconf = pconf;
 	bme280.pdata = pdata;
-	os_setCallback(job, read_func);
+	os_setCallback(job, read_fsm);
 }
 
 int bme280_compensate_T(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme280_data_t *pdata)

@@ -33,7 +33,7 @@ static struct
     conf_t *pconf;
 } ina219;
 
-static void config_func(osjob_t *job)
+static void config_fsm(osjob_t *job)
 {
     /*
     Verifies if the chip is present. 
@@ -55,7 +55,7 @@ static void config_func(osjob_t *job)
         ina219.buf[0] = INA219_REG_CONFIG;
         ina219.buf[1] = (config_powerdown >> 8) & 0xFF;
         ina219.buf[2] = config_powerdown & 0xFF;
-        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, config_func, ina219.pstatus);
+        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, config_fsm, ina219.pstatus);
         break;
     case SLEEP_DONE:
         if (*ina219.pstatus != I2C_OK)
@@ -74,7 +74,7 @@ config_done:
     os_setCallback(job, ina219.cb);
 }
 
-static void read_func(osjob_t *job)
+static void read_fsm(osjob_t *job)
 {
     static enum {
         INIT,
@@ -95,7 +95,7 @@ static void read_func(osjob_t *job)
         ina219.buf[0] = INA219_REG_CALIB;
         ina219.buf[1] = 0x20;
         ina219.buf[2] = 0x00;
-        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_func, ina219.pstatus);
+        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_fsm, ina219.pstatus);
         break;
     case CONF:
         if (*ina219.pstatus != I2C_OK)
@@ -123,18 +123,18 @@ static void read_func(osjob_t *job)
         ina219.buf[0] = INA219_REG_CONFIG;
         ina219.buf[1] = (config >> 8) & 0xFF;
         ina219.buf[2] = config & 0xFF;
-        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_func, ina219.pstatus);
+        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_fsm, ina219.pstatus);
         break;
     case WAIT:
         if (*ina219.pstatus != I2C_OK)
         {
             goto read_error;
         }
-        os_setApproxTimedCallback(job, os_getTime() + ms2osticks(1), read_func);
+        os_setApproxTimedCallback(job, os_getTime() + ms2osticks(1), read_fsm);
         break;
     case READ_SHUNT:
         ina219.buf[0] = INA219_REG_CURRENT;
-        i2c_xfer_ex(INA219_ADDR, ina219.buf, 1, 2, INA219_I2C_TIMEOUT_MS, job, read_func, ina219.pstatus);
+        i2c_xfer_ex(INA219_ADDR, ina219.buf, 1, 2, INA219_I2C_TIMEOUT_MS, job, read_fsm, ina219.pstatus);
         break;
     case SLEEP:
         if (*ina219.pstatus != I2C_OK)
@@ -147,7 +147,7 @@ static void read_func(osjob_t *job)
         ina219.buf[0] = INA219_REG_CONFIG;
         ina219.buf[1] = (config_powerdown >> 8) & 0xFF;
         ina219.buf[2] = config_powerdown & 0xFF;
-        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_func, ina219.pstatus);
+        i2c_xfer_ex(INA219_ADDR, ina219.buf, 3, 0, INA219_I2C_TIMEOUT_MS, job, read_fsm, ina219.pstatus);
 
         break;
     case DONE:
@@ -172,7 +172,7 @@ void ina219_config(osjob_t *job, osjobcb_t cb, int *pstatus)
 {
     ina219.cb = cb;
     ina219.pstatus = pstatus;
-    os_setCallback(job, config_func);
+    os_setCallback(job, config_fsm);
 }
 void ina219_read(osjob_t *job, osjobcb_t cb, int *pstatus, ina219_data_t *pdata, conf_t *pconf)
 {
@@ -180,5 +180,5 @@ void ina219_read(osjob_t *job, osjobcb_t cb, int *pstatus, ina219_data_t *pdata,
     ina219.pstatus = pstatus;
     ina219.pconf = pconf;
     ina219.pdata = pdata;
-    os_setCallback(job, read_func);
+    os_setCallback(job, read_fsm);
 }
