@@ -57,6 +57,25 @@ void app_dl(int port, unsigned char *data, int dlen, unsigned int flags)
     debug_printf("DL[%d]: %h\r\n", port, data, dlen);
 }
 
+void app_event(ev_t e)
+{
+    switch (e)
+    {
+    case EV_JOINING:
+        debug_printf("***************************JOINING\r\n");
+        break;
+
+    case EV_JOINED:
+        debug_printf("***********************************JOINED\r\n");
+        break;
+
+    case EV_JOIN_FAILED:
+        debug_printf("**************************************** JOIN FAILED\r\n");
+        break;
+    default:
+        break;
+    }
+}
 static void sensor_loop(osjob_t *job)
 {
     static int status;
@@ -69,12 +88,11 @@ static void sensor_loop(osjob_t *job)
     uint8_t period = 5;
     static int8_t samples = 0;
 
-    static enum {
-        INIT,
-        MEAS,
-        NEXT,
-        TRANSMIT,
-        DONE,
+    static enum { INIT,
+                  MEAS,
+                  NEXT,
+                  TRANSMIT,
+                  DONE,
     } state;
     switch (state)
     {

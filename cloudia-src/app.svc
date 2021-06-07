@@ -1,5 +1,6 @@
 hook.appstart: app_main
 hook.lwm_downlink: app_dl
+hook.lwm_event:  app_event
 
 require:
     - appstart
