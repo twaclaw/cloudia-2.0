@@ -54,7 +54,7 @@ static void config_fsm(osjob_t *job)
 		}
 
 		bme280.buf[0] = BME280_REG_CTRL_HUMIDITY; //reg 0xF2
-		if ((bme280.pconf->options) & CONF_OPT_H_ENABLED_MASK)
+		if ((bme280.pconf->r1) & CONF_R1_HEN)
 		{
 			bme280.buf[1] = BME280_CTRL_MEAS_OVERSMPL_1;
 		}
@@ -70,11 +70,11 @@ static void config_fsm(osjob_t *job)
 			goto config_error;
 		}
 		uint8_t ctrl_meas = BME280_CTRL_SLEEP_MODE; // bits 1:0
-		if ((bme280.pconf->options) & CONF_OPT_T_ENABLED_MASK)
+		if ((bme280.pconf->r1) & CONF_R1_TEN)
 		{
 			ctrl_meas |= (BME280_CTRL_MEAS_OVERSMPL_1 << 5);
 		}
-		if ((bme280.pconf->options) & CONF_OPT_P_ENABLED_MASK)
+		if ((bme280.pconf->r1) & CONF_R1_PEN)
 		{
 			ctrl_meas |= (BME280_CTRL_MEAS_OVERSMPL_1 << 2);
 		}
@@ -233,6 +233,10 @@ void bme280_read(osjob_t *job, osjobcb_t cb, int *pstatus, bme280_data_t *pdata,
 
 int bme280_compensate_T(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme280_data_t *pdata)
 {
+	/*
+		Tmin = -40.00
+		Tmax = 85.00
+	*/
 	int32_t var1, var2;
 
 	int32_t adc_T = raw_data->T;

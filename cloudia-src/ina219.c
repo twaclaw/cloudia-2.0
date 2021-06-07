@@ -16,7 +16,7 @@
 #include "hw.h"
 #include "ina219.h"
 
-#define CONF_RES_BITS(x) ((ina219.pconf->options & CONF_OPT_I_NBITS_MASK) == x)
+#define CONF_RES_BITS(x) ((ina219.pconf->r2 & CONF_R2_IRES_MASK) == x)
 
 const uint16_t config_shunt_triggered = INA219_CONFIG_GAIN_1_40MV |
                                         INA219_CONFIG_BVOLTRANGE_16V |
@@ -103,19 +103,19 @@ static void read_fsm(osjob_t *job)
             goto read_error;
         }
         uint16_t config = config_shunt_triggered;
-        if (CONF_RES_BITS(CONF_OPT_I_NBITS_12))
+        if (CONF_RES_BITS(CONF_R2_IRES_12BIT))
             config |= INA219_CONFIG_SADCRES_12BIT_1S_532US;
         else
         {
-            if (CONF_RES_BITS(CONF_OPT_I_NBITS_11))
+            if (CONF_RES_BITS(CONF_R2_IRES_11BIT))
                 config |= INA219_CONFIG_SADCRES_11BIT_1S_276US;
             else
             {
-                if (CONF_RES_BITS(CONF_OPT_I_NBITS_10))
+                if (CONF_RES_BITS(CONF_R2_IRES_10BIT))
                     config |= INA219_CONFIG_SADCRES_10BIT_1S_148US;
                 else
                 {
-                    if (CONF_RES_BITS(CONF_OPT_I_NBITS_9))
+                    if (CONF_RES_BITS(CONF_R2_IRES_9BIT))
                         config |= INA219_CONFIG_SADCRES_9BIT_1S_84US;
                 }
             }

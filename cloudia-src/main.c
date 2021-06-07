@@ -62,9 +62,9 @@ static void sensor_loop(osjob_t *job)
     static int status;
 
     static conf_t conf;
-    conf.options = 0x07;
-    conf.period = 0x45; // 5 seconds
-    conf.buffer_size = 55;
+    conf.r1 = 0x07;
+    conf.r3 = 0x45; // 5 seconds
+    conf.r4 = 55;
 
     uint8_t period = 5;
     static int8_t samples = 0;
@@ -80,7 +80,6 @@ static void sensor_loop(osjob_t *job)
     {
     case INIT:
         // bme280_config(job, sensor_loop, &status, &conf);
-        debug_printf("CONFIGURING\r\n");
         ina219_config(job, sensor_loop, &status);
         state = MEAS;
         break;
@@ -93,7 +92,7 @@ static void sensor_loop(osjob_t *job)
     case NEXT:
         //TODO: check status
         debug_printf("status: %d, current: 0x%x\r\n", status, cloudia.ina219.current);
-        if (++samples < conf.buffer_size)
+        if (++samples < conf.r4)
         {
             state = MEAS;
             os_setApproxTimedCallback(job, os_getTime() + sec2osticks(period), sensor_loop);
