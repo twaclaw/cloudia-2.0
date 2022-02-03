@@ -2,6 +2,10 @@ hook.appstart: app_main
 hook.lwm_downlink: app_dl
 hook.lwm_event:  app_event
 
+hook.eefs_fn:
+    - conf_eefs_fn
+hook.eefs_init: conf_eefs_load
+
 require:
     - appstart
     - lwmux

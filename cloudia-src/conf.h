@@ -53,18 +53,30 @@
 #define CONF_PERIOD_MINS_VALUE_MASK (0x7F)
 #define CONF_PERIOD_SECS_HRS_VALUE_MASK (0x3F)
 
+//PORTS
+#define CONF_PORT 144
 typedef struct
 {
     uint8_t r1;
     uint8_t r2;
-    uint8_t r3; //period
-    uint8_t r4; //buffer size
+    uint8_t r3; // period
+    uint8_t r4; // buffer size
     uint8_t r5;
-    uint32_t thesholds[12];
-    uint16_t join_sched[10];
-} conf_t;
+    // uint32_t thesholds[12];
+    // uint16_t join_sched[10];
+} conf_v1_t;
 
-void default_conf(conf_t *conf);
+typedef conf_v1_t conf_t;
 
-
+static const conf_t defaultcfg = {
+    .r1 = CONF_R1_TEN |
+          CONF_R1_HEN |
+          CONF_R1_PEN |
+          CONF_R1_TRES_1DEC,
+    .r2 = CONF_R2_IRES_12BIT |
+          CONF_R2_TDIFFS_AUTO |
+          CONF_R2_HDIFFS_AUTO |
+          CONF_R2_PDIFFS_AUTO,
+    .r3 = 5,
+    .r4 = 5};
 #endif
