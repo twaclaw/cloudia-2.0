@@ -12,6 +12,7 @@
 
 #include <inttypes.h>
 #include "conf.h"
+#include "lmic.h"
 
 #define BME280_ADDR (0x76 << 1)
 #define BME280_ERROR -1

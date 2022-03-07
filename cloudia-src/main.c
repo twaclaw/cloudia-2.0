@@ -13,15 +13,12 @@
 #include "bme280.h"
 #include "ina219.h"
 #include "conf.h"
+#include "cb.h"
 
 static lwm_job lj;
 static osjob_t *mainjob;
 
-static struct
-{
-    bme280_data_t bme280;
-    ina219_data_t ina219;
-} cloudia;
+static cloudia_t cloudia; //cb.h
 
 static const uint8_t UFID_CONFIG[12]  = { 0xb0, 0xb8, 0xca, 0xe0, 0xc0, 0xe0, 0x9d, 0x16, 0x54, 0x2a, 0xea, 0xa0 };
 
@@ -89,6 +86,7 @@ void app_dl(int port, unsigned char *data, int dlen, unsigned int flags)
     if (port == CONF_PORT && dlen == sizeof(config)){
         memcpy(&config, data, dlen);
         conf_save();
+	//TODO: restart FSM?
     }
 }
 
