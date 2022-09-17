@@ -1,5 +1,5 @@
 /*
-  ____ _     ___  _   _ ____  _       
+  ____ _     ___  _   _ ____  _
  / ___| |   / _ \| | | |  _ \(_) __ _
 | |   | |  | | | | | | | | | | |/ _` |
 | |___| |__| |_| | |_| | |_| | | (_| |
@@ -122,17 +122,18 @@ static void sensor_loop(osjob_t *job)
                   TRANSMIT,
                   DONE,
     } state;
+
     switch (state)
     {
     case INIT:
-        // bme280_config(job, sensor_loop, &status, &conf);
-        ina219_config(job, sensor_loop, &status);
+        bme280_config(job, sensor_loop, &status, &config);
+        // ina219_config(job, sensor_loop, &status);
         state = MEAS;
         break;
     case MEAS:
         debug_printf("Measuring: status %d\r\n", status);
-        // bme280_read(job, sensor_loop, &status, &cloudia.bme280, &conf);
-        ina219_read(job, sensor_loop, &status, &cloudia.ina219, &config);
+        bme280_read(job, sensor_loop, &status, &cloudia.bme280, &config);
+        // ina219_read(job, sensor_loop, &status, &cloudia.ina219, &config);
         state = NEXT;
         break;
     case NEXT:
