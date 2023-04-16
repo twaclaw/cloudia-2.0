@@ -9,7 +9,7 @@
 typedef struct
 {
     bme280_data_t bme280;
-    ina219_data_t ina219;
+    // ina219_data_t ina219;
     // TODO: add wind and others
 } cloudia_t;
 
