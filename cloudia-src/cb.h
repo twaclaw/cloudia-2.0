@@ -3,12 +3,14 @@
 
 #include "bme280.h"
 #include "ina219.h"
+#include "sht35.h"
 
 #define CB_SIZE 16
 
 typedef struct
 {
     bme280_data_t bme280;
+    sht35_data_t sht35;
     // ina219_data_t ina219;
     // TODO: add wind and others
 } cloudia_t;
@@ -18,7 +20,6 @@ typedef struct
     cloudia_t data[CB_SIZE];
     int head;
     int tail;
-    bool all_filled;
 } cb_t;
 
 void cb_reset(cb_t *cb);
