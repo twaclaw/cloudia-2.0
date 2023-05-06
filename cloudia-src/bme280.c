@@ -1,6 +1,6 @@
 /*
-  ____ _     ___  _   _ ____  _       
- / ___| |   / _ \| | | |  _ \(_) __ _ 
+  ____ _     ___  _   _ ____  _
+ / ___| |   / _ \| | | |  _ \(_) __ _
 | |   | |  | | | | | | | | | | |/ _` |
 | |___| |__| |_| | |_| | |_| | | (_| |
  \____|_____\___/ \___/|____/|_|\__,_|
@@ -199,7 +199,7 @@ static void read_fsm(osjob_t *job)
 		bme280_compensate_H(bme280.praw_data, bme280.pcalib, bme280.pdata);
 		bme280_compensate_P(bme280.praw_data, bme280.pcalib, bme280.pdata);
 
-		debug_printf("T:%d\tH:%d\tP:%d\r\n", bme280.pdata->T, bme280.pdata->H, bme280.pdata->P);
+		// debug_printf("T:%d\tH:%d\tP:%d\r\n", bme280.pdata->T, bme280.pdata->H, bme280.pdata->P);
 		goto read_done;
 	}
 	state += 1;
@@ -258,6 +258,7 @@ int bme280_compensate_T(bme280_raw_data_t *raw_data, bme280_calib_t *calib, bme2
 	T_high_res = var1 + var2 + T_high_res_adjust;
 
 	pdata->T = (T_high_res * 5 + 128) >> 8;
+	//TODO: Adjust to min max values, e.g.: -5000 to 5000 (-50C to 50C)
 	return 0;
 }
 

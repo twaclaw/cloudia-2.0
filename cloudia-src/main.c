@@ -94,7 +94,7 @@ static bool tx(lwm_txinfo *txinfo)
     int8_t H_diff;
     uint16_t T_diff_max = 0;
     uint8_t H_diff_max = 0;
-    uint8_t T_nbits, H_nbits;
+    uint8_t T_nbits = 0, H_nbits = 0;
 
     if (tx_state.pending)
     {
@@ -145,18 +145,39 @@ static bool tx(lwm_txinfo *txinfo)
             H_diff_max >>= 1;
         }
 
+        status = cb_get(&circ_buf, &dest, offset); // get first value
+        T0 = dest.sht35.T;
+        H0 = dest.sht35.H;
+
         status = 0, offset = tx_state.offset;
+        bool use_diffs = false;
+        if (H_nbits > 8 || T_nbits > 8)
+        {
+            // use complete values
+            // create command 80 or 81 and add it to compress_buff
+            // set boolean variable to use inside the while loop
+        }
+        else
+        {
+            use_diffs = true;
+            // create command 90 or 91 and add it to compress buff
+        }
         while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload - 5))
         {
             status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
-            if (H_nbits > 8 || T_nbits > 8)
+
+            if (use_diffs)
             {
-                // Do not use differences
-                // command 80 or 81
+                T_diff = dest.sht35.T - T0;
+                T0 = dest.sht35.T;
+                H_diff = dest.sht35.H - H0;
+                H0 = dest.sht35.H;
+
+                compress_add_with_sign(&compress_buf, T_diff, T_nbits);
+                compress_add_with_sign(&compress_buf, H_diff, H_nbits);
             }
             else
             {
-                // command 82 or 83 (90 91)
                 compress_add_with_sign(&compress_buf, dest.sht35.T, 11);
                 compress_add(&compress_buf, dest.sht35.H, 7);
             }
