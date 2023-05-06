@@ -5,7 +5,7 @@
 #include "ina219.h"
 #include "sht35.h"
 
-#define CB_SIZE 16
+#define CB_SIZE 250
 
 typedef struct
 {

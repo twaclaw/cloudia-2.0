@@ -77,6 +77,6 @@ static const conf_t defaultcfg = {
           CONF_R2_TDIFFS_AUTO |
           CONF_R2_HDIFFS_AUTO |
           CONF_R2_PDIFFS_AUTO,
-    .r3 = 5,
-    .r4 = 5};
+    .r3 = 60,
+    .r4 = 10};
 #endif

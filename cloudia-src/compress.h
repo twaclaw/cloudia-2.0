@@ -3,7 +3,7 @@
 
 #include <inttypes.h>
 
-#define COMPRESS_BUFF_SIZE 200
+#define COMPRESS_BUFF_SIZE 250
 
 typedef struct {
     uint8_t buff[COMPRESS_BUFF_SIZE];
