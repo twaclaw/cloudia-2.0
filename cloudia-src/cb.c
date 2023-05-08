@@ -39,7 +39,7 @@ int cb_get(cb_t *cb, cloudia_t *dest, uint8_t offset)
     }
 
     int idx, i;
-    for(idx=cb->head, i=0; i < offset; i++, idx = idx > 0 ? idx - 1: CB_SIZE - 1);
+    for(idx=cb->head - 1 >= 0 ? cb->head - 1 : CB_SIZE - 1, i=0; i < offset; i++, idx = idx > 0 ? idx - 1: CB_SIZE - 1);
 
     *dest = cb->data[idx];
     return 0;
