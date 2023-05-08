@@ -96,19 +96,20 @@ static bool tx(lwm_txinfo *txinfo)
     uint8_t H_diff_max = 0;
     uint8_t T_nbits = 0, H_nbits = 0;
 
+    uint8_t port;
+
     if (tx_state.pending)
     {
         int max_payload = LMIC_maxAppPayload();
 
         debug_printf("LMIC Max payload: %d\r\n", max_payload);
         cloudia_t dest;
-        compress_reset(&compress_buf);
 
         int status = 0, offset = tx_state.offset;
 
         // estimate the maximum differences between consecutive
         // T and H values in the buffer
-        status = cb_get(&circ_buf, &dest, offset); // get first value
+        status = cb_get(&circ_buf, &dest, offset++); // get first value
         T0 = dest.sht35.T;
         H0 = dest.sht35.H;
         while ((status == 0 && offset < tx_state.ndata))
@@ -145,32 +146,73 @@ static bool tx(lwm_txinfo *txinfo)
             H_diff_max >>= 1;
         }
 
+        offset = tx_state.offset;
         status = cb_get(&circ_buf, &dest, offset); // get first value
         T0 = dest.sht35.T;
         H0 = dest.sht35.H;
 
-        status = 0, offset = tx_state.offset;
-        bool use_diffs = false;
-        if (H_nbits > 8 || T_nbits > 8)
+        // TODO: use_diffs can also be overwritten by the configuration
+        bool use_diffs = true;
+        if((H_nbits > 8 || T_nbits > 8) || tx_state.ndata < 2)
+            use_diffs = false;
+
+        debug_printf("Hnbits: %d, Tnbits %d -> use_diffs: %d\r\n", H_nbits, T_nbits, use_diffs);
+
+        // Define which command (port) to send
+        int buff_idx = 0;
+        uint8_t SR1, SR2, SR3;
+        uint8_t batt_value = 0;
+
+        // TODO: read batt value
+
+        SR1 = CONF_SR1_TEN | CONF_SR1_HEN | ((1 & CONF_SR1_TRES_MASK) << CONF_SR1_TRES_BIT) | ((batt_value & CONF_SR1_BAT_MASK) << CONF_SR1_BAT_BIT);
+        SR2 = config.r3;
+        SR3 = ((T_nbits & CONF_SR3_TDIFF_MASK) << CONF_SR3_TDIFF_BIT) | ((H_nbits & CONF_SR3_HDIFF_MASK) << CONF_SR3_HDIFF_BIT);
+
+        txinfo->data[buff_idx++] = SR1;
+        if (tx_state.ndata == 1)
         {
-            // use complete values
-            // create command 80 or 81 and add it to compress_buff
-            // set boolean variable to use inside the while loop
+            port = CONF_PORT_SINGLE_MEAS;
+        }
+        else if (use_diffs)
+        {
+            txinfo->data[buff_idx++] = SR2;
+            if (tx_state.offset == 0)
+                port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
+            else
+            {
+                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS;
+                txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
+            }
         }
         else
         {
-            use_diffs = true;
-            // create command 90 or 91 and add it to compress buff
+            txinfo->data[buff_idx++] = SR2;
+            txinfo->data[buff_idx++] = SR3;
+            if (tx_state.offset == 0)
+                port = CONF_PORT_MULT_MEAS_OFFSET_0;
+            else
+            {
+                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0;
+                txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
+            }
         }
+
+        status = 0, offset = tx_state.offset;
+        compress_reset(&compress_buf);
+
+        compress_add_with_sign(&compress_buf, T0, 11);
+        compress_add(&compress_buf, H0, 7);
+        offset++;
+
         while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload - 5))
         {
             status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
-
             if (use_diffs)
             {
                 T_diff = dest.sht35.T - T0;
-                T0 = dest.sht35.T;
                 H_diff = dest.sht35.H - H0;
+                T0 = dest.sht35.T;
                 H0 = dest.sht35.H;
 
                 compress_add_with_sign(&compress_buf, T_diff, T_nbits);
@@ -183,17 +225,18 @@ static bool tx(lwm_txinfo *txinfo)
             }
             offset++;
         }
+
         debug_printf("Byte ptr: %d\r\n", compress_buf.byte_ptr);
 
         int j;
         for (j = 0; j < compress_buf.byte_ptr; j++)
         {
             // TODO: format package, add headers (config buffers with offset)
-            txinfo->data[j] = compress_buf.buff[j];
+            txinfo->data[j+buff_idx] = compress_buf.buff[j];
         }
         debug_printf("Indices j: %d, max: %d", j, max_payload);
-        txinfo->dlen = j;
-        txinfo->port = 80;
+        txinfo->dlen = buff_idx + j;
+        txinfo->port = port;
         txinfo->txcomplete = txc;
 
         tx_state.curr_offset = offset;
@@ -322,8 +365,8 @@ bool app_main(osjob_t *job)
     memcpy(&config, &defaultcfg, sizeof(config));
     debug_printf("Loading default configuration r1: %d, r2: %d, r4: %d\r\n", config.r1, config.r2, config.r4);
 
-    nsamples = 100;  // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
-    meas_period = 1; // TODO: decode config.r3
+    nsamples = 10;  // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
+    meas_period = 5; // TODO: decode config.r3
     cb_reset(&circ_buf);
 
     // join network
@@ -332,6 +375,7 @@ bool app_main(osjob_t *job)
     // re-use current job
     // initiate first uplink
     // next(mainjob);
+    // TODO: wait until joined before going to the sensor loop
     os_setCallback(job, sensor_loop);
     // indicate that we are running
     return true;
