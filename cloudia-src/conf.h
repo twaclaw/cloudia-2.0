@@ -55,6 +55,26 @@
 
 //PORTS
 #define CONF_PORT 144
+#define CONF_PORT_SINGLE_MEAS 80
+#define CONF_PORT_MULT_MEAS_OFFSET_0 81
+#define CONF_PORT_MULT_MEAS_OFFSET_GT_0 82
+#define CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS 90
+#define CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS 91
+
+// Status registers
+#define CONF_SR1_TEN (1<<6)
+#define CONF_SR1_HEN (1<<5)
+#define CONF_SR1_TRES_BIT (3)
+#define CONF_SR1_TRES_MASK (0x3)
+#define CONF_SR1_BAT_BIT (0)
+#define CONF_SR1_BAT_MASK (0x7)
+#define CONF_SR3_TDIFF_BIT (5)
+#define CONF_SR3_TDIFF_MASK (0x7)
+#define CONF_SR3_HDIFF_BIT (2)
+#define CONF_SR3_HDIFF_MASK (0x7)
+
+
+
 typedef struct
 {
     uint8_t r1;
@@ -78,5 +98,5 @@ static const conf_t defaultcfg = {
           CONF_R2_HDIFFS_AUTO |
           CONF_R2_PDIFFS_AUTO,
     .r3 = 60,
-    .r4 = 10};
+    .r4 = 5};
 #endif
