@@ -16,11 +16,12 @@
 #include "conf.h"
 #include "cb.h"
 #include "compress.h"
+#include "data.h"
 
 static lwm_job lj;
 static osjob_t *mainjob;
 
-static cloudia_t cloudia; // cb.h
+static cloudia_t cloudia; // data.h
 static cb_t circ_buf;
 static bool joined = false;
 static int nsamples = 0;
@@ -174,21 +175,9 @@ static bool tx(lwm_txinfo *txinfo)
         {
             port = CONF_PORT_SINGLE_MEAS;
         }
-        else if (use_diffs)
+        else if (!use_diffs)
         {
             txinfo->data[buff_idx++] = SR2;
-            if (tx_state.offset == 0)
-                port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
-            else
-            {
-                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS;
-                txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
-            }
-        }
-        else
-        {
-            txinfo->data[buff_idx++] = SR2;
-            txinfo->data[buff_idx++] = SR3;
             if (tx_state.offset == 0)
                 port = CONF_PORT_MULT_MEAS_OFFSET_0;
             else
@@ -197,12 +186,26 @@ static bool tx(lwm_txinfo *txinfo)
                 txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
             }
         }
+        else
+        {
+            txinfo->data[buff_idx++] = SR2;
+            txinfo->data[buff_idx++] = SR3;
+            if (tx_state.offset == 0)
+                port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
+            else
+            {
+                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS;
+                txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
+            }
+        }
 
         status = 0, offset = tx_state.offset;
         compress_reset(&compress_buf);
 
-        compress_add_with_sign(&compress_buf, T0, 11);
-        compress_add(&compress_buf, H0, 7);
+        // Add first values uncompressed.
+        compress_add_with_sign(&compress_buf, T0, CONF_VAR_T_NBITS);
+        compress_add(&compress_buf, H0, CONF_VAR_H_NBITS);
+
         offset++;
 
         while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload - 5))
@@ -220,21 +223,18 @@ static bool tx(lwm_txinfo *txinfo)
             }
             else
             {
-                compress_add_with_sign(&compress_buf, dest.sht35.T, 11);
-                compress_add(&compress_buf, dest.sht35.H, 7);
+                compress_add_with_sign(&compress_buf, dest.sht35.T, CONF_VAR_T_NBITS);
+                compress_add(&compress_buf, dest.sht35.H, CONF_VAR_H_NBITS);
             }
             offset++;
         }
 
-        debug_printf("Byte ptr: %d\r\n", compress_buf.byte_ptr);
-
         int j;
-        for (j = 0; j < compress_buf.byte_ptr; j++)
+        for (j = 0; j < compress_buf.byte_ptr + (compress_buf.bit_ptr > 1 ? 1 : 0); j++)
         {
             // TODO: format package, add headers (config buffers with offset)
             txinfo->data[j+buff_idx] = compress_buf.buff[j];
         }
-        debug_printf("Indices j: %d, max: %d", j, max_payload);
         txinfo->dlen = buff_idx + j;
         txinfo->port = port;
         txinfo->txcomplete = txc;
@@ -365,8 +365,8 @@ bool app_main(osjob_t *job)
     memcpy(&config, &defaultcfg, sizeof(config));
     debug_printf("Loading default configuration r1: %d, r2: %d, r4: %d\r\n", config.r1, config.r2, config.r4);
 
-    nsamples = 10;  // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
-    meas_period = 5; // TODO: decode config.r3
+    nsamples = 1;  // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
+    meas_period = 10; // TODO: decode config.r3
     cb_reset(&circ_buf);
 
     // join network
