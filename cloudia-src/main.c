@@ -116,13 +116,14 @@ static bool tx(lwm_txinfo *txinfo)
         while ((status == 0 && offset < tx_state.ndata))
         {
             status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
-            if (status)
+            if (!status)
             {
                 T_diff = dest.sht35.T - T0;
-                T_diff_max = T_diff >= 0 ? T_diff : -T_diff; // abs
+                T_diff = T_diff >= 0 ? T_diff : -T_diff; // abs
 
                 H_diff = dest.sht35.H - H0;
-                H_diff_max = H_diff >= 0 ? H_diff : -H_diff; // abs
+                H_diff  = H_diff >= 0 ? H_diff : -H_diff; // abs
+
                 if (T_diff > T_diff_max)
                     T_diff_max = T_diff;
 
@@ -131,6 +132,7 @@ static bool tx(lwm_txinfo *txinfo)
 
                 T0 = dest.sht35.T;
                 H0 = dest.sht35.H;
+
             }
             offset++;
         }
@@ -154,7 +156,7 @@ static bool tx(lwm_txinfo *txinfo)
 
         // TODO: use_diffs can also be overwritten by the configuration
         bool use_diffs = true;
-        if((H_nbits > 8 || T_nbits > 8) || tx_state.ndata < 2)
+        if ((H_nbits > 8 || T_nbits > 8) || tx_state.ndata < 2)
             use_diffs = false;
 
         debug_printf("Hnbits: %d, Tnbits %d -> use_diffs: %d\r\n", H_nbits, T_nbits, use_diffs);
@@ -203,9 +205,9 @@ static bool tx(lwm_txinfo *txinfo)
         compress_reset(&compress_buf);
 
         // Add first values uncompressed.
-        compress_add_with_sign(&compress_buf, T0, CONF_VAR_T_NBITS);
-        compress_add(&compress_buf, H0, CONF_VAR_H_NBITS);
 
+        compress_add_with_sign(&compress_buf, (int32_t)T0, CONF_VAR_T_NBITS);
+        compress_add(&compress_buf, (int32_t)H0, CONF_VAR_H_NBITS);
         offset++;
 
         while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload - 5))
@@ -218,13 +220,13 @@ static bool tx(lwm_txinfo *txinfo)
                 T0 = dest.sht35.T;
                 H0 = dest.sht35.H;
 
-                compress_add_with_sign(&compress_buf, T_diff, T_nbits);
-                compress_add_with_sign(&compress_buf, H_diff, H_nbits);
+                compress_add_with_sign(&compress_buf, (int32_t)T_diff, T_nbits);
+                compress_add_with_sign(&compress_buf, (int32_t)H_diff, H_nbits);
             }
             else
             {
-                compress_add_with_sign(&compress_buf, dest.sht35.T, CONF_VAR_T_NBITS);
-                compress_add(&compress_buf, dest.sht35.H, CONF_VAR_H_NBITS);
+                compress_add_with_sign(&compress_buf, (int32_t)dest.sht35.T, CONF_VAR_T_NBITS);
+                compress_add(&compress_buf, (int32_t)dest.sht35.H, CONF_VAR_H_NBITS);
             }
             offset++;
         }
@@ -233,7 +235,8 @@ static bool tx(lwm_txinfo *txinfo)
         for (j = 0; j < compress_buf.byte_ptr + (compress_buf.bit_ptr > 1 ? 1 : 0); j++)
         {
             // TODO: format package, add headers (config buffers with offset)
-            txinfo->data[j+buff_idx] = compress_buf.buff[j];
+            txinfo->data[j + buff_idx] = compress_buf.buff[j];
+            debug_printf("BUF[%d]: %d\r\n", j, compress_buf.buff[j]);
         }
         txinfo->dlen = buff_idx + j;
         txinfo->port = port;
@@ -365,7 +368,7 @@ bool app_main(osjob_t *job)
     memcpy(&config, &defaultcfg, sizeof(config));
     debug_printf("Loading default configuration r1: %d, r2: %d, r4: %d\r\n", config.r1, config.r2, config.r4);
 
-    nsamples = 1;  // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
+    nsamples = 5;     // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
     meas_period = 10; // TODO: decode config.r3
     cb_reset(&circ_buf);
 
