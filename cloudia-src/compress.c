@@ -19,12 +19,14 @@ void compress_reset(compress_t *c)
         c->buff[i] = 0;
 }
 
-void compress_add(compress_t *c, uint32_t value, uint8_t nbits)
+void compress_add(compress_t *c, int32_t value, uint8_t nbits)
 {
+    uint8_t shift_by, y;
     while (nbits)
     {
-        uint8_t shift_by = min(nbits, 8 - c->bit_ptr);
-        uint8_t y = (uint8_t)(value & MASK[shift_by - 1]);
+        // shift_by = min(nbits, 8 - c->bit_ptr);
+        shift_by = nbits < (8 - c->bit_ptr) ? nbits : (8 - c->bit_ptr);
+        y = (uint8_t)(value & MASK[shift_by - 1]);
         y <<= c->bit_ptr;
         c->buff[c->byte_ptr] |= y;
         nbits -= shift_by;
@@ -53,5 +55,5 @@ void compress_add_with_sign(compress_t *c, int32_t value, uint8_t nbits)
         compress_add(c, 0, 1);
     }
 
-    compress_add(c, abs(value), nbits - 1);
+    compress_add(c, value < 0 ? -value : value, nbits);
 }

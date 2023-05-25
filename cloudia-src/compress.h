@@ -12,6 +12,6 @@ typedef struct {
 } compress_t;
 
 void compress_reset(compress_t *c);
-void compress_add(compress_t *c, uint32_t value, uint8_t nbits);
+void compress_add(compress_t *c, int32_t value, uint8_t nbits);
 void compress_add_with_sign(compress_t *c, int32_t value, uint8_t nbits);
 #endif //__compress__
