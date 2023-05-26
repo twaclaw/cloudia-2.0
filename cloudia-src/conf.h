@@ -74,7 +74,7 @@
 #define CONF_SR3_HDIFF_MASK (0x7)
 
 // Variables sizes
-#define CONF_VAR_T_NBITS 11
+#define CONF_VAR_T_NBITS 10
 #define CONF_VAR_H_NBITS 7
 
 typedef struct

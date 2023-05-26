@@ -159,8 +159,6 @@ static bool tx(lwm_txinfo *txinfo)
         if ((H_nbits > 8 || T_nbits > 8) || tx_state.ndata < 2)
             use_diffs = false;
 
-        debug_printf("Hnbits: %d, Tnbits %d -> use_diffs: %d\r\n", H_nbits, T_nbits, use_diffs);
-
         // Define which command (port) to send
         int buff_idx = 0;
         uint8_t SR1, SR2, SR3;
@@ -220,8 +218,11 @@ static bool tx(lwm_txinfo *txinfo)
                 T0 = dest.sht35.T;
                 H0 = dest.sht35.H;
 
-                compress_add_with_sign(&compress_buf, (int32_t)T_diff, T_nbits);
-                compress_add_with_sign(&compress_buf, (int32_t)H_diff, H_nbits);
+                if (T_nbits > 0)
+                    compress_add_with_sign(&compress_buf, (int32_t)T_diff, T_nbits);
+
+                if (H_nbits > 0)
+                    compress_add_with_sign(&compress_buf, (int32_t)H_diff, H_nbits);
             }
             else
             {
