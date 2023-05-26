@@ -48,10 +48,10 @@
 #define CONF_OPT_I_NBITS_10 (2 << 5)
 #define CONF_OPT_I_NBITS_9 (3 << 5)
 
-#define CONF_PERIOD_MINS_MASK (1 << 7)
-#define CONF_PERIOD_SECS_HRS_MASK (1 << 6)
-#define CONF_PERIOD_MINS_VALUE_MASK (0x7F)
-#define CONF_PERIOD_SECS_HRS_VALUE_MASK (0x3F)
+#define CONF_PERIOD_SECS_BIT (1 << 7)
+#define CONF_PERIOD_HRS_BIT (1 << 6)
+#define CONF_PERIOD_MINS_HRS_VALUE_MASK (0x7F)
+#define CONF_PERIOD_SECS_VALUE_MASK (0x3F)
 
 //PORTS
 #define CONF_PORT 144
@@ -83,7 +83,7 @@ typedef struct
     uint8_t r2;
     uint8_t r3; // period
     uint8_t r4; // buffer size
-    uint8_t r5;
+    // uint8_t r5;
     // uint32_t thesholds[12];
     // uint16_t join_sched[10];
 } conf_v1_t;
@@ -99,6 +99,6 @@ static const conf_t defaultcfg = {
           CONF_R2_TDIFFS_AUTO |
           CONF_R2_HDIFFS_AUTO |
           CONF_R2_PDIFFS_AUTO,
-    .r3 = 60,
-    .r4 = 5};
+    .r3 = (1) & (~CONF_PERIOD_SECS_BIT) & (~CONF_PERIOD_HRS_BIT),
+    .r4 = 1};
 #endif

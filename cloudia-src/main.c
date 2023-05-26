@@ -40,6 +40,36 @@ static tx_state_t tx_state;
 static const uint8_t UFID_CONFIG[12] = {0xb0, 0xb8, 0xca, 0xe0, 0xc0, 0xe0, 0x9d, 0x16, 0x54, 0x2a, 0xea, 0xa0};
 
 static conf_t config;
+static int sensor_loop_samples = 0;
+
+static enum { INIT,
+              MEAS,
+              NEXT,
+              TRANSMIT,
+} sensor_loop_state;
+
+void reset()
+{
+    cb_reset(&circ_buf);
+    sensor_loop_samples = 0;
+    sensor_loop_state = INIT;
+
+    conf_eefs_load();
+    nsamples = config.r4 < CB_SIZE ? config.r4 : CB_SIZE;
+    if (config.r3 & CONF_PERIOD_SECS_BIT)
+        meas_period = config.r3 & CONF_PERIOD_SECS_VALUE_MASK;
+    else
+    {
+        if (config.r3 & CONF_PERIOD_HRS_BIT)
+            meas_period = (config.r3 & CONF_PERIOD_MINS_HRS_VALUE_MASK) * 3600;
+        else
+            meas_period = (config.r3 & CONF_PERIOD_MINS_HRS_VALUE_MASK) * 60;
+        // TODO: check if max number (64 h) fits in the value
+    }
+
+
+    debug_printf("****** FSM Reset *******\r\n");
+}
 
 const char *conf_eefs_fn(const uint8_t *ufid)
 {
@@ -58,10 +88,10 @@ void conf_eefs_load(void)
     if (eefs_read(UFID_CONFIG, &config, sizeof(config)) != sizeof(config))
     {
         // memset(&config, 0, sizeof(config));
-        debug_printf("Loading default configuration");
+        debug_printf("Loading default configuration\r\n");
         memcpy(&config, &defaultcfg, sizeof(config));
-        debug_printf("Loading default configuration r1: %d, r2: %d, r4: %d\n", config.r1, config.r2, config.r4);
     }
+    debug_printf("**** Loading configuration r1: %d, r2: %d, r3: %d, r4: %d\r\n", config.r1, config.r2, config.r3, config.r4);
 }
 
 static void conf_save(void)
@@ -122,7 +152,7 @@ static bool tx(lwm_txinfo *txinfo)
                 T_diff = T_diff >= 0 ? T_diff : -T_diff; // abs
 
                 H_diff = dest.sht35.H - H0;
-                H_diff  = H_diff >= 0 ? H_diff : -H_diff; // abs
+                H_diff = H_diff >= 0 ? H_diff : -H_diff; // abs
 
                 if (T_diff > T_diff_max)
                     T_diff_max = T_diff;
@@ -132,7 +162,6 @@ static bool tx(lwm_txinfo *txinfo)
 
                 T0 = dest.sht35.T;
                 H0 = dest.sht35.H;
-
             }
             offset++;
         }
@@ -235,9 +264,7 @@ static bool tx(lwm_txinfo *txinfo)
         int j;
         for (j = 0; j < compress_buf.byte_ptr + (compress_buf.bit_ptr > 1 ? 1 : 0); j++)
         {
-            // TODO: format package, add headers (config buffers with offset)
             txinfo->data[j + buff_idx] = compress_buf.buff[j];
-            debug_printf("BUF[%d]: %d\r\n", j, compress_buf.buff[j]);
         }
         txinfo->dlen = buff_idx + j;
         txinfo->port = port;
@@ -258,6 +285,7 @@ static void next(osjob_t *job)
     lwm_request_send(&lj, 0, tx);
 }
 
+// Downlinks
 void app_dl(int port, unsigned char *data, int dlen, unsigned int flags)
 {
     debug_printf("DL[%d]: %h\r\n", port, data, dlen);
@@ -265,7 +293,7 @@ void app_dl(int port, unsigned char *data, int dlen, unsigned int flags)
     {
         memcpy(&config, data, dlen);
         conf_save();
-        // TODO: restart FSM?
+        reset();
     }
 }
 
@@ -294,16 +322,7 @@ static void sensor_loop(osjob_t *job)
 {
 
     static int status;
-
-    static int samples = 0;
-
-    static enum { INIT,
-                  MEAS,
-                  NEXT,
-                  TRANSMIT,
-    } state;
-
-    switch (state)
+    switch (sensor_loop_state)
     {
     case INIT:
         // if(!joined){
@@ -315,35 +334,36 @@ static void sensor_loop(osjob_t *job)
         // bme280_config(job, sensor_loop, &status, &config);
 
         os_setCallback(job, sensor_loop);
-        state = MEAS;
+        sensor_loop_state = MEAS;
         break;
     case MEAS:
         sht35_read(job, sensor_loop, &status, &cloudia.sht35);
         // bme280_read(job, sensor_loop, &status, &cloudia.bme280, &config);
         // ina219_read(job, sensor_loop, &status, &cloudia.ina219, &config);
-        state = NEXT;
+        sensor_loop_state = NEXT;
         break;
     case NEXT:
         if (status != 0)
         {
-            state = INIT;
+            sensor_loop_state = INIT;
+            // TODO: check if sec2osticks function is enough for all cases
             os_setApproxTimedCallback(job, os_getTime() + sec2osticks(meas_period), sensor_loop);
             // TODO: fill out status bit for heart beat
             break;
         }
 
-        if (++samples < nsamples)
+        if (++sensor_loop_samples < nsamples)
         {
-            state = MEAS;
+            sensor_loop_state = MEAS;
             os_setApproxTimedCallback(job, os_getTime() + sec2osticks(meas_period), sensor_loop);
         }
         else
         {
             os_setCallback(job, sensor_loop);
-            state = TRANSMIT;
+            sensor_loop_state = TRANSMIT;
         }
 
-        debug_printf("Measuring: status %d, samples :%d\r\n", status, samples);
+        debug_printf("Measuring: status %d, samples :%d\r\n", status, sensor_loop_samples);
         debug_printf("T %d, H :%d\r\n", cloudia.sht35.T, cloudia.sht35.H);
         cb_add(&circ_buf, &cloudia);
         break;
@@ -353,9 +373,9 @@ static void sensor_loop(osjob_t *job)
         tx_state.pending = true;
         mainjob = job;
         next(mainjob);
-        state = MEAS;
+        sensor_loop_state = MEAS;
         os_setApproxTimedCallback(job, os_getTime() + sec2osticks(meas_period), sensor_loop);
-        samples = 0;
+        sensor_loop_samples = 0;
         break;
     }
     return;
@@ -364,14 +384,7 @@ static void sensor_loop(osjob_t *job)
 
 bool app_main(osjob_t *job)
 {
-    // TODO: DELETE ME:
-    debug_printf("TODO: REMOVE ME: Loading default configuration\r\n");
-    memcpy(&config, &defaultcfg, sizeof(config));
-    debug_printf("Loading default configuration r1: %d, r2: %d, r4: %d\r\n", config.r1, config.r2, config.r4);
-
-    nsamples = 5;     // config.r4 < CB_SIZE  ? config.r4 : CB_SIZE;
-    meas_period = 10; // TODO: decode config.r3
-    cb_reset(&circ_buf);
+    reset();
 
     // join network
     lwm_setmode(LWM_MODE_NORMAL);
@@ -379,7 +392,6 @@ bool app_main(osjob_t *job)
     // re-use current job
     // initiate first uplink
     // next(mainjob);
-    // TODO: wait until joined before going to the sensor loop
     os_setCallback(job, sensor_loop);
     // indicate that we are running
     return true;
