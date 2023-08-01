@@ -27,6 +27,7 @@ static bool joined = false;
 static int nsamples = 0;
 static int meas_period = 0;
 
+const uint16_t PROTOCOL_VERSION = 0x01;
 typedef struct
 {
     int ndata; // number of samples to transmit
@@ -60,13 +61,12 @@ void reset()
         meas_period = config.r3 & CONF_PERIOD_SECS_VALUE_MASK;
     else
     {
-        if (config.r3 & CONF_PERIOD_HRS_BIT)
-            meas_period = (config.r3 & CONF_PERIOD_MINS_HRS_VALUE_MASK) * 3600;
-        else
+        if (config.r3 & CONF_PERIOD_MINS_BIT)
             meas_period = (config.r3 & CONF_PERIOD_MINS_HRS_VALUE_MASK) * 60;
+        else
+            meas_period = (config.r3 & CONF_PERIOD_MINS_HRS_VALUE_MASK) * 3600;
         // TODO: check if max number (64 h) fits in the value
     }
-
 
     debug_printf("****** FSM Reset *******\r\n");
 }
@@ -104,7 +104,6 @@ static void sensor_loop(osjob_t *job);
 
 static void txc(void)
 {
-    debug_printf("TXC\r\n");
     if (tx_state.curr_offset < tx_state.ndata)
     {
         tx_state.offset = tx_state.curr_offset;
@@ -114,7 +113,8 @@ static void txc(void)
     {
         tx_state.pending = false;
     }
-    next(mainjob);
+    os_setApproxTimedCallback(mainjob, os_getTime() + sec2osticks(5), next);
+    // next(mainjob);
 }
 
 static bool tx(lwm_txinfo *txinfo)
@@ -132,6 +132,7 @@ static bool tx(lwm_txinfo *txinfo)
     if (tx_state.pending)
     {
         int max_payload = LMIC_maxAppPayload();
+        max_payload = max_payload > 200 ? 200 : max_payload;
 
         debug_printf("LMIC Max payload: %d\r\n", max_payload);
         cloudia_t dest;
@@ -190,23 +191,25 @@ static bool tx(lwm_txinfo *txinfo)
 
         // Define which command (port) to send
         int buff_idx = 0;
-        uint8_t SR1, SR2, SR3;
-        uint8_t batt_value = 0;
+        uint8_t SR1, SR2, SR3, SR4;
+        uint8_t batt_value = 13; // diff between Vbat and 2.5
 
         // TODO: read batt value
 
-        SR1 = CONF_SR1_TEN | CONF_SR1_HEN | ((1 & CONF_SR1_TRES_MASK) << CONF_SR1_TRES_BIT) | ((batt_value & CONF_SR1_BAT_MASK) << CONF_SR1_BAT_BIT);
-        SR2 = config.r3;
-        SR3 = ((T_nbits & CONF_SR3_TDIFF_MASK) << CONF_SR3_TDIFF_BIT) | ((H_nbits & CONF_SR3_HDIFF_MASK) << CONF_SR3_HDIFF_BIT);
+        SR1 = (PROTOCOL_VERSION >> 2) & 0xFF;
+        SR2 = ((PROTOCOL_VERSION & 0x3) << 6) | ((batt_value & 0xF) << 2) | 0x3;
+        SR3 = config.r3;
+        SR4 = ((T_nbits & CONF_SR4_TDIFF_MASK) << CONF_SR4_TDIFF_BIT) | ((H_nbits & CONF_SR4_HDIFF_MASK) << CONF_SR4_HDIFF_BIT);
 
         txinfo->data[buff_idx++] = SR1;
+        txinfo->data[buff_idx++] = SR2;
         if (tx_state.ndata == 1)
         {
             port = CONF_PORT_SINGLE_MEAS;
         }
         else if (!use_diffs)
         {
-            txinfo->data[buff_idx++] = SR2;
+            txinfo->data[buff_idx++] = SR3;
             if (tx_state.offset == 0)
                 port = CONF_PORT_MULT_MEAS_OFFSET_0;
             else
@@ -217,8 +220,8 @@ static bool tx(lwm_txinfo *txinfo)
         }
         else
         {
-            txinfo->data[buff_idx++] = SR2;
             txinfo->data[buff_idx++] = SR3;
+            txinfo->data[buff_idx++] = SR4;
             if (tx_state.offset == 0)
                 port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
             else
@@ -237,7 +240,7 @@ static bool tx(lwm_txinfo *txinfo)
         compress_add(&compress_buf, (int32_t)H0, CONF_VAR_H_NBITS);
         offset++;
 
-        while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload - 5))
+        while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload))
         {
             status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
             if (use_diffs)
@@ -274,7 +277,8 @@ static bool tx(lwm_txinfo *txinfo)
     }
     else
     {
-        debug_printf("Done with TX");
+        debug_printf("Done with TX\r\n");
+        sensor_loop(mainjob);
     }
     debug_printf("TX ....\r\n");
     return true;
@@ -362,9 +366,8 @@ static void sensor_loop(osjob_t *job)
             os_setCallback(job, sensor_loop);
             sensor_loop_state = TRANSMIT;
         }
-
-        debug_printf("Measuring: status %d, samples :%d\r\n", status, sensor_loop_samples);
-        debug_printf("T %d, H :%d\r\n", cloudia.sht35.T, cloudia.sht35.H);
+        // debug_printf("Measuring: status %d, samples :%d\r\n", status, sensor_loop_samples);
+        debug_printf("%d T %d, H :%d\r\n", sensor_loop_samples, cloudia.sht35.T, cloudia.sht35.H);
         cb_add(&circ_buf, &cloudia);
         break;
     case TRANSMIT:
@@ -385,6 +388,8 @@ static void sensor_loop(osjob_t *job)
 bool app_main(osjob_t *job)
 {
     reset();
+    // nsamples = 10;
+    // meas_period = 10;
 
     // join network
     lwm_setmode(LWM_MODE_NORMAL);
