@@ -199,7 +199,15 @@ static bool tx(lwm_txinfo *txinfo)
         SR1 = (PROTOCOL_VERSION >> 2) & 0xFF;
         SR2 = ((PROTOCOL_VERSION & 0x3) << 6) | ((batt_value & 0xF) << 2) | 0x3;
         SR3 = config.r3;
-        SR4 = ((T_nbits & CONF_SR4_TDIFF_MASK) << CONF_SR4_TDIFF_BIT) | ((H_nbits & CONF_SR4_HDIFF_MASK) << CONF_SR4_HDIFF_BIT);
+
+        if (T_nbits == 0 && H_nbits == 0) // if all measurements of each type in the buffer are equal
+        {
+            SR4 = ((nsamples & CONF_SR4_TDIFF_MASK) << CONF_SR4_TDIFF_BIT) | ((nsamples & CONF_SR4_HDIFF_MASK) << CONF_SR4_HDIFF_BIT);
+        }
+        else
+        {
+            SR4 = ((T_nbits & CONF_SR4_TDIFF_MASK) << CONF_SR4_TDIFF_BIT) | ((H_nbits & CONF_SR4_HDIFF_MASK) << CONF_SR4_HDIFF_BIT);
+        }
 
         txinfo->data[buff_idx++] = SR1;
         txinfo->data[buff_idx++] = SR2;
@@ -222,12 +230,19 @@ static bool tx(lwm_txinfo *txinfo)
         {
             txinfo->data[buff_idx++] = SR3;
             txinfo->data[buff_idx++] = SR4;
-            if (tx_state.offset == 0)
-                port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
+            if (T_nbits == 0 && H_nbits == 0)
+            {
+                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_ALL_DIFFS_ZERO;
+            }
             else
             {
-                port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS;
-                txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
+                if (tx_state.offset == 0)
+                    port = CONF_PORT_MULT_MEAS_OFFSET_0_DIFFS;
+                else
+                {
+                    port = CONF_PORT_MULT_MEAS_OFFSET_GT_0_DIFFS;
+                    txinfo->data[buff_idx++] = tx_state.offset & 0xFF; // max offset (currently):255
+                }
             }
         }
 
@@ -240,28 +255,31 @@ static bool tx(lwm_txinfo *txinfo)
         compress_add(&compress_buf, (int32_t)H0, CONF_VAR_H_NBITS);
         offset++;
 
-        while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload))
+        if (T_nbits != 0 || H_nbits != 0)
         {
-            status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
-            if (use_diffs)
+            while ((status == 0 && offset < tx_state.ndata) && (compress_buf.byte_ptr < COMPRESS_BUFF_SIZE && compress_buf.byte_ptr < max_payload))
             {
-                T_diff = dest.sht35.T - T0;
-                H_diff = dest.sht35.H - H0;
-                T0 = dest.sht35.T;
-                H0 = dest.sht35.H;
+                status = cb_get(&circ_buf, &dest, offset); // get meas group from circular buffer starting at offset i
+                if (use_diffs)
+                {
+                    T_diff = dest.sht35.T - T0;
+                    H_diff = dest.sht35.H - H0;
+                    T0 = dest.sht35.T;
+                    H0 = dest.sht35.H;
 
-                if (T_nbits > 0)
-                    compress_add_with_sign(&compress_buf, (int32_t)T_diff, T_nbits);
+                    if (T_nbits > 0)
+                        compress_add_with_sign(&compress_buf, (int32_t)T_diff, T_nbits);
 
-                if (H_nbits > 0)
-                    compress_add_with_sign(&compress_buf, (int32_t)H_diff, H_nbits);
+                    if (H_nbits > 0)
+                        compress_add_with_sign(&compress_buf, (int32_t)H_diff, H_nbits);
+                }
+                else
+                {
+                    compress_add_with_sign(&compress_buf, (int32_t)dest.sht35.T, CONF_VAR_T_NBITS);
+                    compress_add(&compress_buf, (int32_t)dest.sht35.H, CONF_VAR_H_NBITS);
+                }
+                offset++;
             }
-            else
-            {
-                compress_add_with_sign(&compress_buf, (int32_t)dest.sht35.T, CONF_VAR_T_NBITS);
-                compress_add(&compress_buf, (int32_t)dest.sht35.H, CONF_VAR_H_NBITS);
-            }
-            offset++;
         }
 
         int j;
